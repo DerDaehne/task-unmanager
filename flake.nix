@@ -2,13 +2,13 @@
   description = "Recreational programming project: taskmanager on Linux";
 
   inputs = {
-    nixpkgs.url = "github.com:NixOS/nixpkgs/nixos-unstable";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
   };
 
-  outputs = {
+  outputs = { self, nixpkgs }:
     let
-      system = "x86_64-lixnu";
-      pkgs = nixpkg.legacyPackages.${system};
+      system = "x86_64-linux";
+      pkgs = nixpkgs.legacyPackages.${system};
     in
       {
         devShells.${system}.default = pkgs.mkShell {
@@ -26,5 +26,4 @@
           '';
         };
       };
-  };
 }
