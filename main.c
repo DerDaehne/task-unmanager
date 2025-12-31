@@ -45,7 +45,7 @@ int get_meminfo_measurement(char *desired_measurement, int *measurement_value, c
     char meminfo_unit[16];
 
     while (fgets(line_read, READ_BUFFER_SIZE, meminfo)) {
-        if (sscanf(line_read, "%s %d %s", meminfo_measurement,  &meminfo_value, meminfo_unit ) < 3) {
+        if (sscanf(line_read, "%63s %d %15s", meminfo_measurement,  &meminfo_value, meminfo_unit ) < 3) {
             continue;
         }
 
