@@ -11,6 +11,23 @@
       pkgs = nixpkgs.legacyPackages.${system};
     in
       {
+        packages.${system}.default = pkgs.stdenv.mkDerivation {
+          pname = "tum";
+          version = "0.1.0";
+
+          src = ./src;
+
+          buildInputs = [ pkgs.ncurses ];
+
+          buildPhase = ''
+            gcc main.c -o tum
+          '';
+
+          installPhase = ''
+            mkdir -p $out/bin
+            cp tum $out/bin/'';
+        };
+
         devShells.${system}.default = pkgs.mkShell {
           buildInputs = with pkgs; [
             gcc
@@ -23,6 +40,10 @@
 
           shellHook = ''
             echo "C dev environment loaded!"
+          '';
+
+          buildPhase = ''
+            gcc main.c -o tum && ./tum
           '';
         };
       };
