@@ -18,8 +18,8 @@
 #define CPU_LOAD_GUEST_NICE 9
 
 
-int get_meminfo_measurement(char *desired_measurement, int *measurement_value, char *measurement_unit);
-int get_cpu_load_system(int cpu_stat_identifier);
+int mem_get_measurement(char *desired_measurement, int *measurement_value, char *measurement_unit);
+int cpu_get_system_load(int cpu_stat_identifier);
 
 int main() {
     int mem_total = 0;
@@ -27,14 +27,14 @@ int main() {
 
     long USER_HZ = sysconf(_SC_CLK_TCK);
 
-    if (get_meminfo_measurement("MemTotal:", &mem_total, mem_unit) != 0) {
+    if (mem_get_measurement("MemTotal:", &mem_total, mem_unit) != 0) {
         fprintf(stderr, "ERROR: could not get Memory Measurement!\n");
         return 1;
     }
 
     printf("This system has: %d %s of total memory\n", mem_total, mem_unit);
     printf("This system has a USER_HZ of: %ld Jiffies/s \n", USER_HZ);
-    printf("This system has been busy with %d Jiffies in Userspace since boot\n", get_cpu_load_system(CPU_LOAD_USER));
+    printf("This system has been busy with %d Jiffies in Userspace since boot\n", cpu_get_system_load(CPU_LOAD_USER));
 
     return 0;
 }
@@ -50,7 +50,7 @@ int main() {
  *         -1 if file can't be opened
  *          1 if measurement is not found
  */
-int get_meminfo_measurement(char *desired_measurement, int *measurement_value, char *measurement_unit) {
+int mem_get_measurement(char *desired_measurement, int *measurement_value, char *measurement_unit) {
     char line_read[READ_BUFFER_SIZE];
     FILE *meminfo = fopen(PROC_MEMINFO, "r");
 
@@ -96,9 +96,15 @@ int get_meminfo_measurement(char *desired_measurement, int *measurement_value, c
  *     - CPU_LOAD_GUEST
  *     - CPU_LOAD_GUEST_NICE
  *
- * Returns: the value of the requestes stat or -1 if an error occurs
+ * Returns: the value of the requested stat or -1 if an error occurs
  */
-int get_cpu_load_system(int cpu_stat_identifier) {
+int cpu_get_system_load(int cpu_stat_identifier) {
+
+    if ((cpu_stat_identifier < 0) || (cpu_stat_identifier > 9)) {
+        fprintf(stderr, "ERROR: requested cpu_stat_identifier is undefined!\n");
+        return -1;
+    }
+
     int cpu_stat_read_values[10];
     char cpu_string[4];
 
@@ -112,15 +118,21 @@ int get_cpu_load_system(int cpu_stat_identifier) {
 
     if (fgets(line_read, READ_BUFFER_SIZE, cpu_stat) == NULL) {
         fprintf(stderr, "ERROR: %s is unreadable or empty!\n", PROC_STAT);
+        fclose(cpu_stat);
         return -1;
     }
 
-    sscanf(line_read, "%3s %d %d %d %d %d %d %d %d %d %d", cpu_string,
-           &cpu_stat_read_values[0], &cpu_stat_read_values[1],
-           &cpu_stat_read_values[2], &cpu_stat_read_values[3],
-           &cpu_stat_read_values[4], &cpu_stat_read_values[5],
-           &cpu_stat_read_values[6], &cpu_stat_read_values[7],
-           &cpu_stat_read_values[8], &cpu_stat_read_values[9]);
+    if (11 != sscanf(line_read, "%3s %d %d %d %d %d %d %d %d %d %d", cpu_string,
+                     &cpu_stat_read_values[0], &cpu_stat_read_values[1],
+                     &cpu_stat_read_values[2], &cpu_stat_read_values[3],
+                     &cpu_stat_read_values[4], &cpu_stat_read_values[5],
+                     &cpu_stat_read_values[6], &cpu_stat_read_values[7],
+                     &cpu_stat_read_values[8], &cpu_stat_read_values[9])) {
+      fprintf(stderr, "ERROR: could not parse cpu stat information retrieved from the kernel!\n");
+      fclose(cpu_stat);
+      return -1;
+    }
 
-   return cpu_stat_read_values[cpu_stat_identifier];
+    fclose(cpu_stat);
+    return cpu_stat_read_values[cpu_stat_identifier];
 }
