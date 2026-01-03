@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <unistd.h>
+#include <ncurses.h>
 #include "tum.h"
 
 int main() {
@@ -13,9 +14,20 @@ int main() {
         return 1;
     }
 
-    printf("This system has: %d %s of total memory\n", mem_total, mem_unit);
-    printf("This system has a USER_HZ of: %ld Jiffies/s \n", USER_HZ);
-    printf("This system has been busy with %d Jiffies in Userspace since boot\n", cpu_get_system_load(CPU_LOAD_USER));
+
+    initscr();
+
+    newterm(NULL, stdout, stdin);
+
+    printw("This system has: %d %s of total memory\n", mem_total, mem_unit);
+    printw("This system has a USER_HZ of: %ld Jiffies/s \n", USER_HZ);
+    printw("This system has been busy with %d Jiffies in Userspace since boot\n", cpu_get_system_load(CPU_LOAD_USER));
+
+    refresh();
+
+    getch();
+
+    endwin();
 
     return 0;
 }

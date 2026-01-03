@@ -20,7 +20,7 @@
           buildInputs = [ pkgs.ncurses ];
 
           buildPhase = ''
-            gcc main.c tum.c -o tum
+            gcc main.c tum.c -lncurses -o tum
           '';
 
           installPhase = ''
