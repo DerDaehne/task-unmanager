@@ -41,10 +41,6 @@
           shellHook = ''
             echo "C dev environment loaded!"
           '';
-
-          buildPhase = ''
-            gcc main.c -o tum && ./tum
-          '';
         };
       };
 }
