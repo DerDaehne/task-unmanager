@@ -3,17 +3,6 @@
 #include <string.h>
 
 
-/*
- * get_meminfo_measurement - Read a measurement from /proc/meminfo
- *
- * - desired_measurement: Measurement name terminated with ":" (e.g. "MemTotal:")
- * - measurement_value: Output parameter for the value
- * - measurement_unit: output buffer for unit (needs 16+ bytes)
- *
- * Returns: 0 on success
- *         -1 if file can't be opened
- *          1 if measurement is not found
- */
 int mem_get_measurement(char *desired_measurement, int *measurement_value, char *measurement_unit) {
     char line_read[READ_BUFFER_SIZE];
     FILE *meminfo = fopen(PROC_MEMINFO, "r");
@@ -45,23 +34,47 @@ int mem_get_measurement(char *desired_measurement, int *measurement_value, char 
 
 }
 
-/*
- * get_cpu_load_system - reads the total (summed over all cpu cores) system load from /proc/stat
- *
- * cpu_stat_identifier: the specific stat to be retrieved, one of:
- *     - CPU_LOAD_USER
- *     - CPU_LOAD_NICE
- *     - CPU_LOAD_SYSTEM
- *     - CPU_LOAD_IDLE
- *     - CPU_LOAD_IOWAIT
- *     - CPU_LOAD_IRQ
- *     - CPU_LOAD_SOFTIRQ
- *     - CPU_LOAD_STEAL
- *     - CPU_LOAD_GUEST
- *     - CPU_LOAD_GUEST_NICE
- *
- * Returns: the value of the requested stat or -1 if an error occurs
- */
+int* cpu_get_raw_stats(char *cpu_identifier) {
+    static int cpu_stat_extracted_values[10];
+    char cpu_identifier_string_read[8];
+
+    char line_read[READ_BUFFER_SIZE];
+    FILE *cpu_stat = fopen(PROC_STAT, "r");
+
+    if (cpu_stat == NULL) {
+        fprintf(stderr, "ERROR: can't open %s\n", PROC_STAT);
+        return NULL;
+    }
+
+    if (fgets(line_read, READ_BUFFER_SIZE, cpu_stat) == NULL) {
+        fprintf(stderr, "ERROR: %s is unreadable or empty!\n", PROC_STAT);
+        fclose(cpu_stat);
+        return NULL;
+    }
+
+    do {
+        if (11 != sscanf(line_read, "%7s %d %d %d %d %d %d %d %d %d %d", cpu_identifier_string_read,
+                        &cpu_stat_extracted_values[0], &cpu_stat_extracted_values[1],
+                        &cpu_stat_extracted_values[2], &cpu_stat_extracted_values[3],
+                        &cpu_stat_extracted_values[4], &cpu_stat_extracted_values[5],
+                        &cpu_stat_extracted_values[6], &cpu_stat_extracted_values[7],
+                        &cpu_stat_extracted_values[8], &cpu_stat_extracted_values[9])) {
+            fprintf(stderr, "ERROR: could not parse cpu stat information retrieved from the kernel!\n");
+            fclose(cpu_stat);
+            return NULL;
+        }
+
+        if (!strcmp(cpu_identifier, cpu_identifier_string_read)) {
+            break;
+        }
+    }while (fgets(line_read, READ_BUFFER_SIZE, cpu_stat));
+
+
+    fclose(cpu_stat);
+    return cpu_stat_extracted_values;
+
+}
+
 int cpu_get_system_load(int cpu_stat_identifier) {
 
     if ((cpu_stat_identifier < 0) || (cpu_stat_identifier > 9)) {
@@ -69,34 +82,35 @@ int cpu_get_system_load(int cpu_stat_identifier) {
         return -1;
     }
 
-    int cpu_stat_read_values[10];
-    char cpu_string[4];
+    int *cpu_load = cpu_get_raw_stats("cpu");
 
-    char line_read[READ_BUFFER_SIZE];
-    FILE *cpu_stat = fopen(PROC_STAT, "r");
+    return cpu_load[cpu_stat_identifier];
+}
 
-    if (cpu_stat == NULL) {
-        fprintf(stderr, "ERROR: can't open %s\n", PROC_STAT);
-        return -1;
+
+int cpu_get_total_time() {
+
+    int *cpu_stat_read_values = cpu_get_raw_stats("cpu");
+
+    int load_sum = 0;
+    for (int i = 0; i < 10; i++) {
+        load_sum += cpu_stat_read_values[i];
+
     }
+    return load_sum;
+}
 
-    if (fgets(line_read, READ_BUFFER_SIZE, cpu_stat) == NULL) {
-        fprintf(stderr, "ERROR: %s is unreadable or empty!\n", PROC_STAT);
-        fclose(cpu_stat);
-        return -1;
-    }
+int cpu_get_busy_time() {
+    int *cpu_stat_read_values = cpu_get_raw_stats("cpu");
 
-    if (11 != sscanf(line_read, "%3s %d %d %d %d %d %d %d %d %d %d", cpu_string,
-                     &cpu_stat_read_values[0], &cpu_stat_read_values[1],
-                     &cpu_stat_read_values[2], &cpu_stat_read_values[3],
-                     &cpu_stat_read_values[4], &cpu_stat_read_values[5],
-                     &cpu_stat_read_values[6], &cpu_stat_read_values[7],
-                     &cpu_stat_read_values[8], &cpu_stat_read_values[9])) {
-      fprintf(stderr, "ERROR: could not parse cpu stat information retrieved from the kernel!\n");
-      fclose(cpu_stat);
-      return -1;
-    }
+    int busy_sum = cpu_stat_read_values[CPU_LOAD_USER] +
+                   cpu_stat_read_values[CPU_LOAD_NICE] +
+                   cpu_stat_read_values[CPU_LOAD_SYSTEM] +
+                   cpu_stat_read_values[CPU_LOAD_IRQ] +
+                   cpu_stat_read_values[CPU_LOAD_SOFTIRQ] +
+                   cpu_stat_read_values[CPU_LOAD_STEAL] +
+                   cpu_stat_read_values[CPU_LOAD_GUEST] +
+                   cpu_stat_read_values[CPU_LOAD_GUEST_NICE];
 
-    fclose(cpu_stat);
-    return cpu_stat_read_values[cpu_stat_identifier];
+    return busy_sum;
 }
