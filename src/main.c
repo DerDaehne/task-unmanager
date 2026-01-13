@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <ncurses.h>
+#define TUM_IMPLEMENTATION
 #include "tum.h"
 
 #define NCURSES_TIMEOUT 1000
