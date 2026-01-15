@@ -1,27 +1,30 @@
+#include <ctype.h>
 #include <stdio.h>
 #include <ncurses.h>
+#include <dirent.h>
 #define TUM_IMPLEMENTATION
 #include "tum.h"
 
 #define NCURSES_TIMEOUT 1000
+#define PROC "/proc"
 
 int draw_quickinfo_bar(WINDOW *quickinfo_bar_window, double cpu_load_percentage);
+int draw_proccess_list(WINDOW *process_list_window, int scroll_offset);
 
 int main() {
 
     bool tum_running = true;
+    int process_list_scroll_offset = 0;
 
     initscr();
     WINDOW *quickinfo_bar_window = newwin(3, COLS, LINES-3, 0);
+    WINDOW *process_list_window = newwin(LINES-3, COLS, 0, 0);
 
     if (!quickinfo_bar_window) {
       endwin();
       fprintf(stderr, "ERROR: could not initialize quickinfo_bar_window!");
       return -1;
     }
-
-    wprintw(stdscr, "This Window has %d lines and %d cols.\n", LINES, COLS);
-    wrefresh(stdscr);
 
     timeout(NCURSES_TIMEOUT);
     noecho();
@@ -36,6 +39,8 @@ int main() {
         last_cpu_usage = current_cpu_usage;
         current_cpu_usage = cpu_get_busy_time();
 
+        draw_proccess_list(process_list_window, process_list_scroll_offset);
+
         if (current_total_jiffies - last_total_jiffies > 0) {
             cpu_load_percentage =  100 * (current_cpu_usage - last_cpu_usage) / (current_total_jiffies - last_total_jiffies);
         }
@@ -43,14 +48,26 @@ int main() {
         draw_quickinfo_bar(quickinfo_bar_window, cpu_load_percentage);
 
         int ch = getch();
-        if (ch == 'q') {
-            tum_running = false;
+        switch (ch) {
+            case 'q':
+                tum_running = false;
+                break;
+            case 'j':
+                if (process_list_scroll_offset >= 0) {
+                    process_list_scroll_offset++;
+                }
+                break;
+            case 'k':
+                if (process_list_scroll_offset >= 1) {
+                    process_list_scroll_offset--;
+                }
         }
     }
 
 
 
     delwin(quickinfo_bar_window);
+    delwin(process_list_window);
     endwin();
 
     return 0;
@@ -77,5 +94,38 @@ int draw_quickinfo_bar(WINDOW *quickinfo_bar_window, double cpu_load_percentage)
 
     wrefresh(quickinfo_bar_window);
 
+    return 0;
+}
+
+int draw_proccess_list(WINDOW *process_list_window, int scroll_offset) {
+    DIR *proc = opendir(PROC);
+    struct dirent *proc_child;
+
+    int line_counter = 0;
+    int remaining_free_lines = LINES - 3;
+    int x = 0;
+    int y = 2;
+
+    wclear(process_list_window);
+
+
+    wprintw(process_list_window, "PID     |\n");
+    mvwhline(process_list_window, 1, 0, 0, COLS);
+
+    while ((proc_child = readdir(proc)) && remaining_free_lines > 0) {
+
+        if (!isdigit(proc_child->d_name[0])) {
+            continue;
+        }
+
+        if (line_counter >= scroll_offset) {
+            mvwprintw(process_list_window, y++, x, "%8s|", proc_child->d_name);
+            remaining_free_lines--;
+        }
+
+        line_counter++;
+    }
+
+    wrefresh(process_list_window);
     return 0;
 }
