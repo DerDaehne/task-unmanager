@@ -21,7 +21,7 @@ int main() {
 
     bool tum_running = true;
     int process_list_scroll_offset = 0;
-    int curs_y = 2;
+    int curs_y = PROCESS_LIST_WINDOW_HEADER_HEIGHT;
     int curs_x = 0;
 
     initscr();
@@ -91,7 +91,7 @@ int main() {
             case KEY_RESIZE:
                 mvwin(quickinfo_bar_window, LINES - QUICK_INFO_BAR_HEIGHT , 0);
                 wresize(process_list_window, LINES - QUICK_INFO_BAR_HEIGHT, COLS);
-                curs_y = 2;
+                curs_y = PROCESS_LIST_WINDOW_HEADER_HEIGHT;
                 curs_x = 0;
                 break;
         }
