@@ -8,6 +8,12 @@
 #define NCURSES_TIMEOUT 1000
 #define PROC "/proc"
 
+#define QUICK_INFO_BAR_HEIGHT 3
+#define PROCESS_LIST_WINDOW_HEADER_HEIGHT 2
+
+#define COLOR_PAIR_NORMAL 1
+#define COLOR_PAIR_INFOBAR 2
+
 int draw_quickinfo_bar(WINDOW *quickinfo_bar_window, double cpu_load_percentage);
 int draw_proccess_list(WINDOW *process_list_window, int scroll_offset);
 
@@ -19,13 +25,27 @@ int main() {
     int curs_x = 0;
 
     initscr();
-    WINDOW *quickinfo_bar_window = newwin(3, COLS, LINES-3, 0);
-    WINDOW *process_list_window = newwin(LINES-3, COLS, 0, 0);
 
+    WINDOW *quickinfo_bar_window = newwin(QUICK_INFO_BAR_HEIGHT, COLS, LINES - QUICK_INFO_BAR_HEIGHT, 0);
     if (!quickinfo_bar_window) {
       endwin();
-      fprintf(stderr, "ERROR: could not initialize quickinfo_bar_window!");
+      fprintf(stderr, "FATAL: could not initialize quickinfo_bar_window!");
       return -1;
+    }
+
+    WINDOW *process_list_window = newwin(LINES - QUICK_INFO_BAR_HEIGHT, COLS, 0, 0);
+    if (!process_list_window) {
+        endwin();
+        fprintf(stderr, "FATAL: could not initialize process_list_window!");
+        return -1;
+    }
+
+    if (has_colors()) {
+        start_color();
+        init_pair(COLOR_PAIR_NORMAL, COLOR_WHITE, COLOR_BLACK);
+        init_pair(COLOR_PAIR_INFOBAR, COLOR_BLACK, COLOR_WHITE);
+
+        wbkgdset(quickinfo_bar_window, COLOR_PAIR(COLOR_PAIR_INFOBAR));
     }
 
     timeout(NCURSES_TIMEOUT);
@@ -55,22 +75,24 @@ int main() {
                 tum_running = false;
                 break;
             case 'j':
-                if ((curs_y >= 2) && (curs_y < LINES - 4) ) {
+                if ((curs_y >= PROCESS_LIST_WINDOW_HEADER_HEIGHT) && (curs_y < LINES - QUICK_INFO_BAR_HEIGHT - 1 ) ) {
                     curs_y++;
-                } else if (curs_y == LINES - 4) {
+                } else if (curs_y == LINES - QUICK_INFO_BAR_HEIGHT - 1) {
                    process_list_scroll_offset++;
                 }
                 break;
             case 'k':
-                if (curs_y > 2) {
+                if (curs_y > PROCESS_LIST_WINDOW_HEADER_HEIGHT) {
                     curs_y--;
-                } else if ((curs_y == 2) && process_list_scroll_offset > 0) {
+                } else if ((curs_y == PROCESS_LIST_WINDOW_HEADER_HEIGHT) && process_list_scroll_offset > 0) {
                     process_list_scroll_offset--;
                 }
                 break;
             case KEY_RESIZE:
-                mvwin(quickinfo_bar_window, LINES - 3 , 0);
-                wresize(process_list_window, LINES - 3, COLS);
+                mvwin(quickinfo_bar_window, LINES - QUICK_INFO_BAR_HEIGHT , 0);
+                wresize(process_list_window, LINES - QUICK_INFO_BAR_HEIGHT, COLS);
+                curs_y = 2;
+                curs_x = 0;
                 break;
         }
 
@@ -93,6 +115,7 @@ int draw_quickinfo_bar(WINDOW *quickinfo_bar_window, double cpu_load_percentage)
     int x = 1;
     int y = 1;
 
+
     if (mem_get_measurement("MemTotal:", &mem_total, mem_unit) != 0) {
         endwin();
         fprintf(stderr, "ERROR: could not get Memory Measurement!\n");
@@ -113,7 +136,7 @@ int draw_proccess_list(WINDOW *process_list_window, int scroll_offset) {
     struct dirent *proc_child;
 
     int line_counter = 0;
-    int remaining_free_lines = LINES - 3;
+    int remaining_free_lines = LINES - QUICK_INFO_BAR_HEIGHT;
     int x = 0;
     int y = 2;
 
