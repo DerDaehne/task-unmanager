@@ -69,12 +69,66 @@ int cpu_get_total_time();
  */
 int cpu_get_busy_time();
 
+// returns the process name to a given pid
+char* process_get_name(char *pid);
+
+// returns the cmdline of a given pid
+char* process_get_cmdline(char *pid);
+
 #endif // TUM_H_
 
 #ifdef TUM_IMPLEMENTATION
 
 #include <stdio.h>
 #include <string.h>
+
+char* process_get_name(char *pid) {
+    static char process_name[16] = "";
+
+    char line_read[READ_BUFFER_SIZE];
+    char proc_pid_path[64] = "";
+    char process_status_attr[64] = "";
+
+    strcpy(proc_pid_path, "/proc/\0");
+    strcat(proc_pid_path, pid);
+    strcat(proc_pid_path, "/status");
+
+    FILE *proc_pid_status = fopen(proc_pid_path, "r");
+    while (fgets(line_read, READ_BUFFER_SIZE, proc_pid_status)) {
+        sscanf(line_read, "%63s %15s", process_status_attr, process_name);
+        if (!strcmp(process_status_attr, "Name:")) {
+            fclose(proc_pid_status);
+            return process_name;
+        }
+
+    }
+
+    fclose (proc_pid_status);
+    return "ERROR";
+}
+
+char* process_get_cmdline(char *pid) {
+    static char process_cmdline[64] = "";
+
+    char line_read[READ_BUFFER_SIZE];
+    char proc_cmdline_path[64] = "";
+
+    strcpy(proc_cmdline_path, "/proc/\0");
+    strcat(proc_cmdline_path, pid);
+    strcat(proc_cmdline_path, "/cmdline");
+
+    FILE *proc_cmdline_status = fopen(proc_cmdline_path, "r");
+
+    if (fgets(line_read, READ_BUFFER_SIZE, proc_cmdline_status) == NULL) {
+        fclose (proc_cmdline_status);
+        return "";
+    }
+
+    strncpy(process_cmdline, line_read, 64);
+
+    fclose (proc_cmdline_status);
+    return process_cmdline;
+}
 
 int mem_get_measurement(char *desired_measurement, int *measurement_value, char *measurement_unit) {
     char line_read[READ_BUFFER_SIZE];

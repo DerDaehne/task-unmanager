@@ -15,6 +15,8 @@ int main() {
 
     bool tum_running = true;
     int process_list_scroll_offset = 0;
+    int curs_y = 2;
+    int curs_x = 0;
 
     initscr();
     WINDOW *quickinfo_bar_window = newwin(3, COLS, LINES-3, 0);
@@ -39,13 +41,13 @@ int main() {
         last_cpu_usage = current_cpu_usage;
         current_cpu_usage = cpu_get_busy_time();
 
-        draw_proccess_list(process_list_window, process_list_scroll_offset);
 
         if (current_total_jiffies - last_total_jiffies > 0) {
             cpu_load_percentage =  100 * (current_cpu_usage - last_cpu_usage) / (current_total_jiffies - last_total_jiffies);
         }
 
         draw_quickinfo_bar(quickinfo_bar_window, cpu_load_percentage);
+        draw_proccess_list(process_list_window, process_list_scroll_offset);
 
         int ch = getch();
         switch (ch) {
@@ -53,18 +55,29 @@ int main() {
                 tum_running = false;
                 break;
             case 'j':
-                if (process_list_scroll_offset >= 0) {
-                    process_list_scroll_offset++;
+                if ((curs_y >= 2) && (curs_y < LINES - 4) ) {
+                    curs_y++;
+                } else if (curs_y == LINES - 4) {
+                   process_list_scroll_offset++;
                 }
                 break;
             case 'k':
-                if (process_list_scroll_offset >= 1) {
+                if (curs_y > 2) {
+                    curs_y--;
+                } else if ((curs_y == 2) && process_list_scroll_offset > 0) {
                     process_list_scroll_offset--;
                 }
+                break;
+            case KEY_RESIZE:
+                mvwin(quickinfo_bar_window, LINES - 3 , 0);
+                wresize(process_list_window, LINES - 3, COLS);
+                break;
         }
+
+        move(curs_y, curs_x);
+        wrefresh(quickinfo_bar_window);
+        wrefresh(process_list_window);
     }
-
-
 
     delwin(quickinfo_bar_window);
     delwin(process_list_window);
@@ -92,8 +105,6 @@ int draw_quickinfo_bar(WINDOW *quickinfo_bar_window, double cpu_load_percentage)
     mvwprintw(quickinfo_bar_window, y++, x, "This system has: %d %s of total memory\n", mem_total, mem_unit);
     mvwprintw(quickinfo_bar_window, y++, x, "CPU load: %f %%", cpu_load_percentage);
 
-    wrefresh(quickinfo_bar_window);
-
     return 0;
 }
 
@@ -109,23 +120,25 @@ int draw_proccess_list(WINDOW *process_list_window, int scroll_offset) {
     wclear(process_list_window);
 
 
-    wprintw(process_list_window, "PID     |\n");
+    wprintw(process_list_window, "%-8s|%-16.16s|%-64.64s|", "   PID", "     PName", "                          cmdline");
     mvwhline(process_list_window, 1, 0, 0, COLS);
 
     while ((proc_child = readdir(proc)) && remaining_free_lines > 0) {
 
-        if (!isdigit(proc_child->d_name[0])) {
-            continue;
-        }
+      if (!isdigit(proc_child->d_name[0])) {
+        continue;
+      }
 
-        if (line_counter >= scroll_offset) {
-            mvwprintw(process_list_window, y++, x, "%8s|", proc_child->d_name);
-            remaining_free_lines--;
-        }
+      if (line_counter >= scroll_offset) {
+        mvwprintw(process_list_window, y++, x, "%8s %-16.16s|%-64.64s|",
+                  proc_child->d_name,
+                  process_get_name(proc_child->d_name),
+                  process_get_cmdline(proc_child->d_name));
+        remaining_free_lines--;
+      }
 
-        line_counter++;
+      line_counter++;
     }
 
-    wrefresh(process_list_window);
     return 0;
 }
